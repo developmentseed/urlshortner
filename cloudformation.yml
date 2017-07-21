@@ -1,0 +1,83 @@
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Devseed's url shortener based on Amazon S3 and Amazon CloudFront.
+
+Parameters:
+  S3BucketName:
+    Type: String
+    Description: Enter the Amazon S3 bucket to use for the URL shortener, or leave empty to create a new bucket with automatically generated name. The S3 bucket is kept after you delete this template.
+    Default: ds-io-urlshortner
+  URLExpiration:
+    Type: Number
+    Default: 2000
+    Description: Expiration in days for short URLs. After this delay, short URLs will be automatically deleted.
+
+Conditions:
+  CreateNewBucket: !Equals ["", !Ref S3BucketName]
+
+Outputs:
+  S3BucketName:
+    Description: "Amazon S3 bucket name holding short URLs redirect objects. Note: the bucket will not be deleted when you delete this template."
+    Value: !Ref S3BucketForURLs
+  ConnectURL:
+    Description: URL to connect to the admin page of the URL Shortener. Do not use until you update the template with the API Gateway endpoint you need to manually create.
+    Value: !Sub "https://${CloudFrontDistrib.DomainName}/admin/"
+
+Resources:
+  S3BucketForURLs:
+    Type: "AWS::S3::Bucket"
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !If [ "CreateNewBucket", !Ref "AWS::NoValue", !Ref S3BucketName ]
+      WebsiteConfiguration:
+        IndexDocument: "index.html"
+      LifecycleConfiguration:
+        Rules:
+          -
+            Id: DisposeShortUrls
+            ExpirationInDays: !Ref URLExpiration
+            Prefix: "u"
+            Status: Enabled
+
+  S3BucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Ref S3BucketForURLs
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Sid: AddPerm
+            Effect: Allow
+            Principal: "*"
+            Action: "s3:GetObject"
+            Resource: !Sub "arn:aws:s3:::${S3BucketForURLs}/*"
+
+  CloudFrontDistrib:
+    Type: "AWS::CloudFront::Distribution"
+    Properties:
+      DistributionConfig:
+        Origins:
+          -
+            DomainName: !GetAtt S3BucketForURLsDomain.Domain
+            Id: OriginRedirect
+            OriginPath: "/u"
+            CustomOriginConfig:
+              OriginProtocolPolicy: "http-only"
+          -
+            DomainName: !GetAtt S3BucketForURLsDomain.Domain
+            Id: OriginAdmin
+            CustomOriginConfig:
+              OriginProtocolPolicy: "http-only"
+          -
+            DomainName: !Sub "${URLShortenerAPI}.execute-api.${AWS::Region}.amazonaws.com"
+            Id: OriginAPIGW
+            CustomOriginConfig:
+              OriginProtocolPolicy: "match-viewer"
+        Comment: CloudFront distribution used as a front end to the server-less URL Shortener
+        Enabled: true
+        DefaultCacheBehavior:
+          ForwardedValues:
+            QueryString: false
+          TargetOriginId: "OriginRedirect"
+          ViewerProtocolPolicy: "redirect-to-https"

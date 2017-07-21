@@ -1,0 +1,23 @@
+{
+  "name": "urlshortner",
+  "version": "0.1.0",
+  "description": "Devseed's URL shortener",
+  "main": "index.js",
+  "bin": {
+    "shortener": "./add.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/developmentseed/urlshortner.git"
+  },
+  "author": "Alireza Jazayeri <alireza@developmentseed.org>",
+  "bugs": {
+    "url": "https://github.com/developmentseed/urlshortner/issues"
+  },
+  "homepage": "https://github.com/developmentseed/urlshortner#readme",
+  "dependencies": {
+    "aws-sdk": "^2.88.0",
+    "commander": "^2.11.0",
+    "minimist": "^1.2.0"
+  }
+}
